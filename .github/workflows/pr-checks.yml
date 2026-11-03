@@ -1,0 +1,50 @@
+# Middle loop: strict, PR-time checks (see HARNESS.md > Constraints).
+#
+# NOT YET a required branch-protection check on main (deliberate — see
+# HARNESS.md > Rung vs. reach). It runs and reports on every PR, but a
+# failure here does not currently block a merge.
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+env:
+  BETTERLEAKS_VERSION: "1.9.0"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Install Betterleaks (v1.x stable, pinned)
+        run: |
+          curl -sL -o betterleaks.tar.gz \
+            "https://github.com/betterleaks/betterleaks/releases/download/v${BETTERLEAKS_VERSION}/betterleaks_${BETTERLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf betterleaks.tar.gz betterleaks
+          chmod +x betterleaks
+          rm betterleaks.tar.gz
+
+      - name: Secrets scan (Betterleaks, detection-only)
+        run: ./betterleaks dir --no-banner --exit-code 1 .
+
+      - name: Test coverage on new/modified components
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: ./scripts/check-test-coverage.sh

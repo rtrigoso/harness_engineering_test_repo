@@ -1,0 +1,66 @@
+# Middle loop: agent-backed review of HARNESS.md changes (see HARNESS.md).
+# Only runs when a PR actually touches HARNESS.md. Posts a PR comment with
+# findings — report-only, never blocks (no branch protection either way;
+# see HARNESS.md > Rung vs. reach).
+name: HARNESS.md Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "HARNESS.md"
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code — HARNESS.md review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            This PR modifies HARNESS.md. Review the diff
+            (`gh pr diff ${{ github.event.pull_request.number }}`)
+            against the actual state of the repository. HARNESS.md
+            declares constraints, garbage-collection rules, and
+            enforcement status; your job is to find discrepancies
+            between what it now claims and what is actually true in
+            the codebase — not to review code quality or style.
+
+            Specifically check:
+            - Every "Tool" field references a script/command that
+              actually exists at that path and does what the
+              Rule/Enforcement fields claim.
+            - Every "Enforcement" and "Scope" value matches where the
+              check actually runs (inner loop hooks in
+              .claude/hooks/, middle loop in
+              .github/workflows/pr-checks.yml, outer loop in
+              .github/workflows/outer-loop.yml) and whether it
+              actually blocks or is advisory.
+            - The Status block's enforcement ratio matches the actual
+              count of constraints at each level.
+            - Any factual/technical claim in the prose (e.g. version
+              requirements) is directionally correct.
+
+            Do not comment on wording, style, or anything that isn't
+            a factual or logical inconsistency.
+
+            Post your findings as a single PR comment via
+            `gh pr comment ${{ github.event.pull_request.number }}`.
+            If you find nothing, post exactly: "No discrepancies
+            found in this HARNESS.md change."
+
+          claude_args: |
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"

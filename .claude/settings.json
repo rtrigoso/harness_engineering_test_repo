@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(HARNESS.md)",
+      "Write(HARNESS.md)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/pretooluse-lint.sh",
+            "statusMessage": "Linting touched file (advisory)"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/stop-sweep.sh",
+            "statusMessage": "Running harness sweep (lint + typecheck + secrets scan)"
+          }
+        ]
+      }
+    ]
+  }
+}
